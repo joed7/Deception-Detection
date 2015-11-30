@@ -4,24 +4,22 @@ from nltk.corpus import stopwords
 from nltk.tokenize import sent_tokenize, word_tokenize
 from _collections import defaultdict
 from nltk.tag import pos_tag
-import math
+from sklearn.feature_extraction import DictVectorizer
+import numpy as np
+from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score
 
 
 dataset={}
 train={}
 test={}
 stopword={}
-
-dict={}
-dict['F']=defaultdict(int)
-dict['T']=defaultdict(int)
-
-vocab=0
-totalF=0
-totalR=0
+vec = DictVectorizer()
+clf = None
 
 def loadDataSet(name):
-    global dataset
+    global dataset,stopword
+    
     fileObject = open(name,'r')  
     dataset = pickle.load(fileObject)  
     #print len(dataset['r'])
@@ -50,7 +48,6 @@ def splitData():
     #print(str(len(temp)) + ","+str(len(positive)) )
     
     temp=[]
-    
     for i in range(tr_size):
         random_index = randrange(0,len(fake))        
         temp.append(fake[random_index])
@@ -63,72 +60,95 @@ def splitData():
 
 def train_data():
     #train positive examples
-    global vocab,totalF,totalR,dict
+    global vocab,totalF,totalR,dict,clf
     
-    dict={}
-    dict['F']=defaultdict(int)
-    dict['T']=defaultdict(int)
-
     pos_docs=train['T']
+    
+    training_data=[]
+    label_data=[]
     
     
     for pos_doc in pos_docs:
         #id-1174
+        features=defaultdict(int)
         pos_doc=pos_doc[7:]
         sentences = sent_tokenize(pos_doc)
+        
         for s in sentences:
             words = word_tokenize(s)
-            for word in words:
-                if word.isalpha() and not word in stopword:
-                    dict['T'][word]= dict['T'][word]+1
+            tagged = pos_tag(words)
+            for word,tag in tagged:
+                if word.isalpha() and not isStopWord(word):
+                    features[tag]=features[tag]+1
+                    #features[word]=features[word]+1
+                   
+        training_data.append(features)
+        label_data.append('T')
                      
     fake_docs=train['F']
     
     for fake_doc in fake_docs:
+
+        features=defaultdict(int)
         fake_doc=fake_doc[7:]
         sentences = sent_tokenize(fake_doc)
+      
         for s in sentences:
             words = word_tokenize(s)
-            for word in words:
-                if word.isalpha() and not word in stopword:
-                    dict['F'][word]= dict['F'][word]+1    
-                    
-    vocab = len(dict['T']) + len(dict['F'])                
-    
-    for (k,v) in dict['F'].items():
-        totalF=totalF+v
+            tagged = pos_tag(words)
             
-    for (k,v) in dict['T'].items():
-        totalR=totalR+v
-
+            for word,tag in tagged:
+                if word.isalpha() and not isStopWord(word):
+                    features[tag]=features[tag]+1
+                    #features[word]=features[word]+1
+        training_data.append(features)   
+        label_data.append('F')        
+    
+    feature_matrix = vec.fit_transform(training_data).toarray()     
+    label_matrix = np.array(label_data)
+    
+    
+    clf = SVC(kernel='linear',C=1)
+    clf.fit(feature_matrix, label_matrix)
+    
 def test_data1():
     
-    correct =0
-    tot=0
+    test_data=[]
+    labeled_data=[]
+    
     for (label,docs) in test.items():
         for doc in docs:
+           
             tag_word=[]
             id = doc[0:7]
             doc = doc[7:]
             sentences = sent_tokenize(doc)
-           
+            features=defaultdict(int)
+            
             for s in sentences:
                 words = word_tokenize(s)
                 tagged = pos_tag(words)
-                tag_word = tag_word +tagged
-                #print tagged
-            cat = classify(id, tag_word) 
-            tot = tot +1
-            if label == cat:
-                correct = correct + 1
+
+                for word,tag in tagged:
+                    if word.isalpha() and not isStopWord(word):
+                        features[tag]=features[tag]+1
+                        #features[word]=features[word]+1
+
+            test_data.append(features)
+            labeled_data.append(label)
             
-    print('accuracy='+str(1.0*correct/tot))
-    return 1.0*correct/tot
+            
+    
+    output = classify(test_data) 
+    return accuracy_score(output, np.array(labeled_data))
+    #print('accuracy='+str(1.0*correct/tot))
+    #return 1.0*correct/tot
     
 def test_data2():
     
     fileObject = open('../data/normal', 'r')  
     inputData = fileObject.readlines()
+    test_data=[]
    
    
     for doc in inputData:
@@ -139,54 +159,31 @@ def test_data2():
         doc = doc[7:]
         
         sentences = sent_tokenize(doc)
-       
+        features=defaultdict(int)       
+        
         for s in sentences:
             words = word_tokenize(s)
             tagged = pos_tag(words)
-            tag_word = tag_word +tagged
-            #print tagged
-        cat = classify(id, tag_word) 
-        print id+'\t'+cat
            
-def classify(id,words):
-    
-    #POS
-    Rcontri=0
-    Fcontri=0
-    
-    for (word,tag) in words:
-
-        if word in stopword:
-            continue
+            for word,tag in tagged:
+                if word.isalpha() and not isStopWord(word):
+                    features[tag]=features[tag]+1
+                    #features[word]=features[word]+1        
         
-        if not word.isalpha():
-             continue
-       
-        #if  (not tag.startswith('NN')) and (not tag.startswith('JJ')) and (not tag.startswith('VB')) and (not tag.startswith(' RB')):
-            #continue
+        test_data.append(features)
+
+    output = classify(test_data)
 
             
-                
-        rcount=dict['T'][word]
-        fcount = dict['F'][word]
-        
-        #print(word+"->"+str(count))
-        
-        rcontri = (1+rcount)*1.0/(totalR+vocab)
-        fcontri = (1+fcount)*1.0/(totalF+vocab)
-       
-        valr=math.log(rcontri)
-        valf=math.log(fcontri)
-        
-        Rcontri = Rcontri+valr
-        Fcontri = Fcontri + valf
-
+def classify(test_data):
     
-    if math.fabs(Rcontri) < math.fabs(Fcontri):
-        return 'T'
-    else:
-        return 'F'
-      
+    test_matrix = vec.transform(test_data).toarray()     
+    return clf.predict(test_matrix)
+
+
+def isStopWord(word):
+    return word in stopword     
+ 
 #loadDataSet('../data/sentiment')
 result = 0
 loadDataSet('../data/dataset')      
@@ -194,6 +191,10 @@ loadDataSet('../data/dataset')
 for i in range(10):
     splitData()  
     train_data()
-    result = result + test_data1()
+    accuracy  = test_data1()
+    result = result + accuracy
+    print accuracy
+
 print('Final Accuracy:'+str(result*1.0/10))    
+
 #test_data2()

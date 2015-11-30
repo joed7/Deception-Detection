@@ -78,9 +78,10 @@ def train_data():
         sentences = sent_tokenize(pos_doc)
         for s in sentences:
             words = word_tokenize(s)
-            for word in words:
+            tagged = pos_tag(words)
+            for word,tag in tagged:
                 if word.isalpha() and not word in stopword:
-                    dict['T'][word]= dict['T'][word]+1
+                    dict['T'][tag]= dict['T'][tag]+1
                      
     fake_docs=train['F']
     
@@ -89,9 +90,10 @@ def train_data():
         sentences = sent_tokenize(fake_doc)
         for s in sentences:
             words = word_tokenize(s)
-            for word in words:
+            tagged = pos_tag(words)
+            for word,tag in tagged:
                 if word.isalpha() and not word in stopword:
-                    dict['F'][word]= dict['F'][word]+1    
+                    dict['F'][tag]= dict['F'][tag]+1    
                     
     vocab = len(dict['T']) + len(dict['F'])                
     
@@ -167,8 +169,8 @@ def classify(id,words):
 
             
                 
-        rcount=dict['T'][word]
-        fcount = dict['F'][word]
+        rcount=dict['T'][tag]
+        fcount = dict['F'][tag]
         
         #print(word+"->"+str(count))
         
