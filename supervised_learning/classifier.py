@@ -74,14 +74,21 @@ def train_data():
         pos_doc=pos_doc[7:]
         sentences = sent_tokenize(pos_doc)
         
+        #features['numsen']=len(sentences)
+        total_words = 0
+        
         for s in sentences:
             words = word_tokenize(s)
             tagged = pos_tag(words)
+            total_words = total_words +len(words)
+            
             for word,tag in tagged:
                 if word.isalpha() and not isStopWord(word):
                     features[tag]=features[tag]+1
                     #features[word]=features[word]+1
-                   
+        
+        #features['avg_word'] = total_words * 1.0 /len(sentences)     
+              
         training_data.append(features)
         label_data.append('T')
                      
@@ -92,15 +99,21 @@ def train_data():
         features=defaultdict(int)
         fake_doc=fake_doc[7:]
         sentences = sent_tokenize(fake_doc)
-      
+       
+        #features['numsen']=len(sentences)
+        total_words = 0
+              
         for s in sentences:
             words = word_tokenize(s)
             tagged = pos_tag(words)
-            
+            total_words = total_words +len(words)
+                        
             for word,tag in tagged:
                 if word.isalpha() and not isStopWord(word):
                     features[tag]=features[tag]+1
                     #features[word]=features[word]+1
+
+        #features['avg_word'] = total_words * 1.0 /len(sentences)     
         training_data.append(features)   
         label_data.append('F')        
     
@@ -123,30 +136,37 @@ def test_data1():
             id = doc[0:7]
             doc = doc[7:]
             sentences = sent_tokenize(doc)
+            
             features=defaultdict(int)
+            #features['numsen']=len(sentences)
+            total_words = 0            
             
             for s in sentences:
                 words = word_tokenize(s)
                 tagged = pos_tag(words)
 
+                total_words = total_words +len(words)
+
                 for word,tag in tagged:
                     if word.isalpha() and not isStopWord(word):
                         features[tag]=features[tag]+1
                         #features[word]=features[word]+1
-
+            #features['avg_word'] = total_words * 1.0 /len(sentences)
+            
             test_data.append(features)
             labeled_data.append(label)
             
             
     
     output = classify(test_data) 
+    #print output
     return accuracy_score(output, np.array(labeled_data))
     #print('accuracy='+str(1.0*correct/tot))
     #return 1.0*correct/tot
     
 def test_data2():
     
-    fileObject = open('../data/normal', 'r')  
+    fileObject = open('../data/test.txt', 'r')  
     inputData = fileObject.readlines()
     test_data=[]
    
@@ -160,19 +180,27 @@ def test_data2():
         
         sentences = sent_tokenize(doc)
         features=defaultdict(int)       
+   
+        #features['numsen']=len(sentences)
+        total_words = 0           
         
         for s in sentences:
+            test_data = []
             words = word_tokenize(s)
             tagged = pos_tag(words)
-           
+            total_words = total_words +len(words)
+            
             for word,tag in tagged:
                 if word.isalpha() and not isStopWord(word):
                     features[tag]=features[tag]+1
                     #features[word]=features[word]+1        
+        #features['avg_word'] = total_words * 1.0 /len(sentences)
         
         test_data.append(features)
 
-    output = classify(test_data)
+        output = classify(test_data)
+        #print output[0]
+        print str(id)+'\t'+output[0]
 
             
 def classify(test_data):
@@ -183,7 +211,13 @@ def classify(test_data):
 
 def isStopWord(word):
     return word in stopword     
- 
+
+def show_most_informative_features(vectorizer, clf, n=20):
+    feature_names = vectorizer.get_feature_names()
+    coefs_with_fns = sorted(zip(clf.coef_[0], feature_names))
+    top = zip(coefs_with_fns[:n], coefs_with_fns[:-(n + 1):-1])
+    for (coef_1, fn_1), (coef_2, fn_2) in top:
+        print "\t%.4f\t%-15s\t\t%.4f\t%-15s" % (coef_1, fn_1, coef_2, fn_2) 
 #loadDataSet('../data/sentiment')
 result = 0
 loadDataSet('../data/dataset')      
@@ -194,7 +228,9 @@ for i in range(10):
     accuracy  = test_data1()
     result = result + accuracy
     print accuracy
+    #test_data2()
+
 
 print('Final Accuracy:'+str(result*1.0/10))    
-
+#show_most_informative_features(vec,clf)
 #test_data2()
