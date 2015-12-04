@@ -16,7 +16,17 @@ test={}
 stopword={}
 vec = DictVectorizer()
 clf = None
+senclf =None
+senvec = None
 
+
+def loadPickle(name):
+    fileObject = open(name,'r')  
+    b = pickle.load(fileObject)  
+    fileObject.close()
+    return b
+
+    
 def loadDataSet(name):
     global dataset,stopword
     
@@ -34,7 +44,7 @@ def splitData():
     fake = dataset['F'][:]
     
     size = len(positive)
-    tr_size = int(size*0.8)
+    tr_size = int(size*1.0)
     
     temp=[]
     for i in range(tr_size):
@@ -72,6 +82,10 @@ def train_data():
         #id-1174
         features=defaultdict(int)
         pos_doc=pos_doc[7:]
+        
+        polarity = getsetiment(pos_doc)
+        addPolarityFeature(features, polarity)
+        
         sentences = sent_tokenize(pos_doc)
         
         #features['numsen']=len(sentences)
@@ -100,6 +114,8 @@ def train_data():
         fake_doc=fake_doc[7:]
         sentences = sent_tokenize(fake_doc)
        
+        polarity = getsetiment(fake_doc)
+        addPolarityFeature(features, polarity)
         #features['numsen']=len(sentences)
         total_words = 0
               
@@ -119,7 +135,7 @@ def train_data():
     
     feature_matrix = vec.fit_transform(training_data).toarray()     
     label_matrix = np.array(label_data)
-    
+    #print vec.get_feature_names()
     
     clf = SVC(kernel='linear',C=1)
     clf.fit(feature_matrix, label_matrix)
@@ -136,8 +152,11 @@ def test_data1():
             id = doc[0:7]
             doc = doc[7:]
             sentences = sent_tokenize(doc)
-            
             features=defaultdict(int)
+            
+            polarity = getsetiment(doc)
+            addPolarityFeature(features, polarity)
+            
             #features['numsen']=len(sentences)
             total_words = 0            
             
@@ -180,7 +199,9 @@ def test_data2():
         
         sentences = sent_tokenize(doc)
         features=defaultdict(int)       
-   
+        
+        polarity = getsetiment(doc)
+        addPolarityFeature(features, polarity)
         #features['numsen']=len(sentences)
         total_words = 0           
         
@@ -201,7 +222,6 @@ def test_data2():
         output = classify(test_data)
         #print output[0]
         print str(id)+'\t'+output[0]
-
             
 def classify(test_data):
     
@@ -219,16 +239,37 @@ def show_most_informative_features(vectorizer, clf, n=20):
     for (coef_1, fn_1), (coef_2, fn_2) in top:
         print "\t%.4f\t%-15s\t\t%.4f\t%-15s" % (coef_1, fn_1, coef_2, fn_2) 
 #loadDataSet('../data/sentiment')
+
+def getsetiment(sentence):
+    testset = senvec.transform([ sentence ])
+    out=senclf.predict(testset)
+    
+    if out[0] == 0:
+        return 'N'
+    else:
+        return 'P'
+
+def addPolarityFeature(feature,polarity):
+    if polarity == 'P':
+        feature['polarity']='p'
+    else:
+        feature['polarity']='n'    
+    
+        
+    
 result = 0
 loadDataSet('../data/dataset')      
+senclf = loadPickle('../data/svm.pkl')
+senvec = loadPickle('../data/vect.pkl')
 
-for i in range(10):
+
+for i in range(1):
     splitData()  
     train_data()
-    accuracy  = test_data1()
-    result = result + accuracy
-    print accuracy
-    #test_data2()
+    #accuracy  = test_data1()
+    #result = result + accuracy
+    #print accuracy
+    test_data2()
 
 
 print('Final Accuracy:'+str(result*1.0/10))    
